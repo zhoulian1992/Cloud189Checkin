@@ -1,4 +1,12 @@
 name: Cloud check in action
+
+# 安全加固版：
+# 1. 所有第三方 Action 固定到完整 commit SHA，不再使用 @main / @master 可变引用；
+# 2. 移除 shine1594/secrets-to-env-action，不再把 toJSON(secrets) 交给第三方 Action；
+#    账号与推送配置改由本工作流显式注入环境变量（同时兼容 Secrets 与 Variables）；
+# 3. 显式声明最小权限，移除 delete-workflow-runs 这一步及其 actions: write 权限；
+# 4. Keep Running 改用 checkout 持久化的凭据推送，不再把 token 明文拼进 remote URL。
+
 on:
   push:
     branches:
@@ -8,6 +16,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: 35 2 * * *
+
+# contents: write 仅用于 "Keep Running" 的空提交，防止 60 天无提交导致定时任务被停用
+permissions:
+  contents: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -17,10 +30,10 @@ jobs:
         run: sleep $((RANDOM % 301))
 
       - name: 🔌 Check out code
-        uses: actions/checkout@main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: 🔨 Setup Node.js environment
-        uses: actions/setup-node@main
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 18
           cache: npm
@@ -29,28 +42,60 @@ jobs:
         if: vars.debug == '1'
         run: |
           echo "CLOUD189_VERBOSE=1" >> $GITHUB_ENV
-      
+
       - name: 📹 Restore cached Cookie
         id: cache-cookie-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .token
           key: cloud189-token-${{ hashFiles('.token/*.json') }}
           restore-keys: cloud189-token-
 
-      - name: 🔧 Init secrets
-        uses: shine1594/secrets-to-env-action@master
-        with:
-          secrets: ${{ toJSON(secrets) }}
-          secrets_env: production
-          prefix_prod: ""
-          file_name_prod: .env
-
       - name: 📡 Init dependencies
         run: npm install
 
+      # 账号与推送配置只注入给真正需要的这一步。
+      # 优先读 Secrets，其次读 Variables；未配置的项为空串，脚本会自动跳过。
+      # 多账号推荐用 TY_ACCOUNTS（JSON 数组，数量不限）；若用序号方式，下面已支持 1~10，
+      # 更多账号按同样格式继续追加 TY_USERNAME_11 / TY_PASSWORD_11 即可。
       - name: 🚀 Run
-        uses: nick-fields/retry@master
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        env:
+          TY_ACCOUNTS: ${{ secrets.TY_ACCOUNTS || vars.TY_ACCOUNTS }}
+          TY_USERNAME_1: ${{ secrets.TY_USERNAME_1 || vars.TY_USERNAME_1 }}
+          TY_PASSWORD_1: ${{ secrets.TY_PASSWORD_1 || vars.TY_PASSWORD_1 }}
+          TY_USERNAME_2: ${{ secrets.TY_USERNAME_2 || vars.TY_USERNAME_2 }}
+          TY_PASSWORD_2: ${{ secrets.TY_PASSWORD_2 || vars.TY_PASSWORD_2 }}
+          TY_USERNAME_3: ${{ secrets.TY_USERNAME_3 || vars.TY_USERNAME_3 }}
+          TY_PASSWORD_3: ${{ secrets.TY_PASSWORD_3 || vars.TY_PASSWORD_3 }}
+          TY_USERNAME_4: ${{ secrets.TY_USERNAME_4 || vars.TY_USERNAME_4 }}
+          TY_PASSWORD_4: ${{ secrets.TY_PASSWORD_4 || vars.TY_PASSWORD_4 }}
+          TY_USERNAME_5: ${{ secrets.TY_USERNAME_5 || vars.TY_USERNAME_5 }}
+          TY_PASSWORD_5: ${{ secrets.TY_PASSWORD_5 || vars.TY_PASSWORD_5 }}
+          TY_USERNAME_6: ${{ secrets.TY_USERNAME_6 || vars.TY_USERNAME_6 }}
+          TY_PASSWORD_6: ${{ secrets.TY_PASSWORD_6 || vars.TY_PASSWORD_6 }}
+          TY_USERNAME_7: ${{ secrets.TY_USERNAME_7 || vars.TY_USERNAME_7 }}
+          TY_PASSWORD_7: ${{ secrets.TY_PASSWORD_7 || vars.TY_PASSWORD_7 }}
+          TY_USERNAME_8: ${{ secrets.TY_USERNAME_8 || vars.TY_USERNAME_8 }}
+          TY_PASSWORD_8: ${{ secrets.TY_PASSWORD_8 || vars.TY_PASSWORD_8 }}
+          TY_USERNAME_9: ${{ secrets.TY_USERNAME_9 || vars.TY_USERNAME_9 }}
+          TY_PASSWORD_9: ${{ secrets.TY_PASSWORD_9 || vars.TY_PASSWORD_9 }}
+          TY_USERNAME_10: ${{ secrets.TY_USERNAME_10 || vars.TY_USERNAME_10 }}
+          TY_PASSWORD_10: ${{ secrets.TY_PASSWORD_10 || vars.TY_PASSWORD_10 }}
+          SENDKEY: ${{ secrets.SENDKEY || vars.SENDKEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || vars.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || vars.TELEGRAM_CHAT_ID }}
+          WECOM_BOT_KEY: ${{ secrets.WECOM_BOT_KEY || vars.WECOM_BOT_KEY }}
+          WECOM_BOT_TELPHONE: ${{ secrets.WECOM_BOT_TELPHONE || vars.WECOM_BOT_TELPHONE }}
+          WX_PUSHER_APP_TOKEN: ${{ secrets.WX_PUSHER_APP_TOKEN || vars.WX_PUSHER_APP_TOKEN }}
+          WX_PUSHER_UID: ${{ secrets.WX_PUSHER_UID || vars.WX_PUSHER_UID }}
+          PUSH_PLUS_TOKEN: ${{ secrets.PUSH_PLUS_TOKEN || vars.PUSH_PLUS_TOKEN }}
+          SHOWDOC_KEY: ${{ secrets.SHOWDOC_KEY || vars.SHOWDOC_KEY }}
+          BARK_KEY: ${{ secrets.BARK_KEY || vars.BARK_KEY }}
+          BARK_SERVER: ${{ secrets.BARK_SERVER || vars.BARK_SERVER }}
+          WPUSH_APIKEY: ${{ secrets.WPUSH_APIKEY || vars.WPUSH_APIKEY }}
+          WPUSH_CHANNEL: ${{ secrets.WPUSH_CHANNEL || vars.WPUSH_CHANNEL }}
+          WPUSH_TOPIC_CODE: ${{ secrets.WPUSH_TOPIC_CODE || vars.WPUSH_TOPIC_CODE }}
         with:
           timeout_minutes: 30
           max_attempts: 3
@@ -64,7 +109,7 @@ jobs:
 
       - name: 📹 Save cached Cookie
         if: always() && env.TOKEN_HASH != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .token
           key: cloud189-token-${{ env.TOKEN_HASH }}
@@ -72,17 +117,8 @@ jobs:
       - name: 🚗 Keep Running
         if: github.event_name == 'schedule'
         run: |
-          git config --local user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-          git config --local user.name "${{ github.actor }}"
-          git remote set-url origin https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git pull --rebase --autostash
           git commit --allow-empty -m "Keep Running..."
           git push
-
-      - name: 🎉 Delete old workflow run
-        uses: Mattraks/delete-workflow-runs@main
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 0
-          keep_minimum_runs: 50
